@@ -1,0 +1,419 @@
+openapi: 3.0.0
+info:
+  title: Smart Waste Segregator Admin Dashboard API
+  description: Complete API for managing IoT-enabled smart waste bins with real-time monitoring, analytics, and admin controls
+  version: 1.0.0
+  contact:
+    name: Support
+    email: support@wastesegregator.com
+
+servers:
+  - url: http://localhost:5000/api
+    description: Development server
+  - url: https://api.wastesegregator.com/api
+    description: Production server
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+
+  schemas:
+    Bin:
+      type: object
+      properties:
+        _id:
+          type: string
+        binId:
+          type: string
+          example: BIN-001
+        category:
+          type: string
+          enum: [metal, biodegradable, non-biodegradable, others]
+        location:
+          type: string
+          example: Zone A
+        capacity:
+          type: number
+          example: 100
+        fillLevel:
+          type: number
+          example: 50
+        status:
+          type: string
+          enum: [active, inactive, maintenance]
+        lastUpdated:
+          type: string
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+
+    ImageRecord:
+      type: object
+      properties:
+        _id:
+          type: string
+        binId:
+          type: string
+        imageUrl:
+          type: string
+        predictedCategory:
+          type: string
+          enum: [metal, biodegradable, non-biodegradable, others]
+        confidence:
+          type: number
+          minimum: 0
+          maximum: 1
+        actualCategory:
+          type: string
+          enum: [metal, biodegradable, non-biodegradable, others]
+        isVerified:
+          type: boolean
+        timestamp:
+          type: string
+          format: date-time
+
+    Command:
+      type: object
+      properties:
+        _id:
+          type: string
+        binId:
+          type: string
+        commandType:
+          type: string
+          enum: [empty, calibrate, reset, test]
+        status:
+          type: string
+          enum: [pending, sent, executed, failed]
+        createdAt:
+          type: string
+          format: date-time
+
+    Alert:
+      type: object
+      properties:
+        _id:
+          type: string
+        binId:
+          type: string
+        alertType:
+          type: string
+          enum: [overflow, offline, misclassification, maintenance_due]
+        severity:
+          type: string
+          enum: [low, medium, high, critical]
+        isResolved:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+
+paths:
+  /auth/register:
+    post:
+      summary: Register new admin user
+      tags: [Authentication]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+                  minLength: 8
+                name:
+                  type: string
+                role:
+                  type: string
+                  enum: [admin, manager, operator]
+      responses:
+        201:
+          description: User registered successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      accessToken:
+                        type: string
+                      refreshToken:
+                        type: string
+
+  /auth/login:
+    post:
+      summary: Login admin user
+      tags: [Authentication]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+      responses:
+        200:
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      accessToken:
+                        type: string
+                      refreshToken:
+                        type: string
+
+  /bins:
+    get:
+      summary: Get all bins
+      tags: [Bins]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: category
+          in: query
+          schema:
+            type: string
+            enum: [metal, biodegradable, non-biodegradable, others]
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [active, inactive, maintenance]
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 10
+      responses:
+        200:
+          description: List of bins
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Bin'
+
+    post:
+      summary: Create new bin
+      tags: [Bins]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                binId:
+                  type: string
+                category:
+                  type: string
+                  enum: [metal, biodegradable, non-biodegradable, others]
+                location:
+                  type: string
+                capacity:
+                  type: number
+      responses:
+        201:
+          description: Bin created successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    $ref: '#/components/schemas/Bin'
+
+  /iot/update:
+    post:
+      summary: IoT device sends sensor data
+      tags: [IoT]
+      security:
+        - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                binId:
+                  type: string
+                fillLevel:
+                  type: number
+                  minimum: 0
+                  maximum: 100
+                sensorStatus:
+                  type: string
+                  enum: [ok, error, warning]
+                imageUrl:
+                  type: string
+                  format: uri
+      responses:
+        200:
+          description: Data received successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+
+  /iot/commands/{binId}:
+    get:
+      summary: Get pending commands for bin
+      tags: [IoT]
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - name: binId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        200:
+          description: List of pending commands
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Command'
+
+  /analytics/waste-count:
+    get:
+      summary: Get waste count by category
+      tags: [Analytics]
+      security:
+        - BearerAuth: []
+      responses:
+        200:
+          description: Waste count statistics
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      labels:
+                        type: array
+                        items:
+                          type: string
+                      datasets:
+                        type: array
+                        items:
+                          type: object
+
+  /alerts:
+    get:
+      summary: Get all alerts
+      tags: [Alerts]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: severity
+          in: query
+          schema:
+            type: string
+            enum: [low, medium, high, critical]
+        - name: isResolved
+          in: query
+          schema:
+            type: boolean
+      responses:
+        200:
+          description: List of alerts
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Alert'
+
+  /feedback:
+    post:
+      summary: Submit feedback
+      tags: [Feedback]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                category:
+                  type: string
+                  enum: [bug, feature-request, general, complaint]
+                rating:
+                  type: integer
+                  minimum: 1
+                  maximum: 5
+                message:
+                  type: string
+                email:
+                  type: string
+                  format: email
+      responses:
+        201:
+          description: Feedback submitted successfully
