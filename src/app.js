@@ -42,7 +42,7 @@ app.use("/api/images", require("./routes/imageRoutes"))
 app.use("/api/commands", require("./routes/commandRoutes"))
 app.use("/api/maintenance", require("./routes/maintenanceRoutes"))
 app.use("/api/workers", require("./routes/workerRoutes"))
-app.use("/api/alerts", require("./routes/alertRoutes"))
+//app.use("/api/alerts", require("./routes/alertRoutes"))
 app.use("/api/analytics", require("./routes/analyticsRoutes"))
 app.use("/api/feedback", require("./routes/feedbackRoutes"))
 
